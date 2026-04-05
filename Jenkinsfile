@@ -2,74 +2,97 @@ pipeline {
     agent any
 
     environment {
-        // 定义变量，方便修改
-        // 注意：这里填你 GitHub 的用户名/仓库名
-        DOCKER_IMAGE = 'lynnirist-lang/crawler-jenkins' 
-        DOCKER_TAG = 'latest'
+        // 定义共享目录，对应你 Docker 挂载的 /opt/share_data
+        SHARED_DATA = "/share_data"
+        // 定义当前工作空间
+        WORKSPACE_DIR = "${WORKSPACE}"
     }
 
     stages {
-        // 阶段 1: 拉取代码
-        stage('Checkout') {
+        stage('检出代码') {
             steps {
-                echo '🚀 正在从 GitHub 拉取最新代码...'
-                // 这里会自动使用你在 Jenkins 任务里配置的 Git 地址
+                // 从 GitHub 拉取代码
                 checkout scm
             }
         }
 
-        // 阶段 2: 构建 Docker 镜像
-        stage('Build Docker Image') {
+        stage('准备 Python 环境') {
             steps {
-                echo '🔨 正在构建 Docker 镜像...'
-                // 使用 Dockerfile 构建镜像，并打上标签
-                sh """
-                    docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} .
-                """
+                script {
+                    echo '正在安装 Python 依赖...'
+                    // 确保 Jenkins 容器内安装了 python3 和 pip3
+                    // 如果 requirements.txt 存在，则安装依赖
+                    sh '''
+                        if [ -f "requirements.txt" ]; then
+                            pip3 install -r requirements.txt
+                        else
+                            echo "requirements.txt 未找到，跳过依赖安装"
+                        fi
+                    '''
+                }
             }
         }
 
-        // 阶段 3: 运行容器进行测试
-        stage('Run Container') {
+        stage('执行爬虫任务') {
             steps {
-                echo '🐳 正在启动容器进行冒烟测试...'
-                // 启动容器，后台运行，映射端口（假设你的程序用 8080，根据实际情况改）
-                // --name 指定容器名，方便后续删除
-                sh """
-                    docker run -d --name test-container -p 8080:8080 ${DOCKER_IMAGE}:${DOCKER_TAG}
-                """
+                script {
+                    echo '开始执行微博爬虫...'
+
+                    // 步骤 1: 获取热搜关键词
+                    // 注意：确保 tools/get_weibo_hot_search.py 路径正确
+                    sh '''
+                        echo "步骤 1: 爬取热搜关键词"
+                        python3 tools/get_weibo_hot_search.py
+                    '''
+
+                    // 步骤 2: 根据关键词爬取帖子
+                    // 注意：这里假设 main.py 是你的入口，且配置已指向生成的关键词文件
+                    sh '''
+                        echo "步骤 2: 爬取帖子内容"
+                        python3 main.py
+                    '''
+
+                    // 步骤 3: 获取发帖人信息
+                    sh '''
+                        echo "步骤 3: 获取发帖人信息"
+                        python3 -m media_platform.weibo.fetch_poster_info
+                    '''
+                }
             }
         }
 
-        // 阶段 4: 验证服务是否存活 (冒烟测试)
-        stage('Verify Service') {
+        stage('归档结果到共享目录') {
             steps {
-                echo '🔍 正在检查服务是否正常运行...'
-                // 等待 5 秒让服务启动
-                sh 'sleep 5'
-                // 检查容器是否还在运行 (如果容器启动报错，它会立刻退出)
-                sh """
-                    if [ "\$(docker inspect -f '{{.State.Running}}' test-container)" == "true" ]; then
-                        echo "✅ 容器运行正常！"
-                    else
-                        echo "❌ 容器启动失败，查看日志："
-                        docker logs test-container
-                        error "构建失败：容器未能保持运行状态"
-                    fi
-                """
+                script {
+                    echo '正在将结果保存到共享目录...'
+
+                    // 创建以时间戳命名的子目录，防止文件覆盖
+                    // 使用 Jenkins 的 BUILD_ID 作为文件夹名
+                    sh """
+                        TARGET_DIR=${SHARED_DATA}/weibo_data_\${BUILD_ID}
+                        mkdir -p \${TARGET_DIR}
+
+                        # 假设你的数据输出在 data 目录下，请根据实际输出路径调整
+                        # 这里使用 cp -r 递归复制
+                        if [ -d "data" ]; then
+                            cp -r data/* \${TARGET_DIR}/
+                        fi
+
+                        # 如果有其他生成的文件，也一并复制
+                        # cp *.json \${TARGET_DIR}/
+                    """
+                    echo "数据已保存至宿主机目录: /opt/share_data/weibo_data_${env.BUILD_ID}"
+                }
             }
         }
     }
 
-    // 无论成功失败，最后都要执行的清理工作
     post {
-        always {
-            echo '🧹 正在清理环境...'
-            // 停止并删除测试容器
-            sh '''
-                docker stop test-container || true
-                docker rm test-container || true
-            '''
+        success {
+            echo '🎉 爬虫任务执行成功！请检查宿主机的 /opt/share_data 目录。'
+        }
+        failure {
+            echo '❌ 任务执行失败，请查看控制台输出排查错误。'
         }
     }
 }
