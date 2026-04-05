@@ -160,12 +160,20 @@ class WeiboCrawler(AbstractCrawler):
         for keyword in config.KEYWORDS.split(","):
             source_keyword_var.set(keyword)
             utils.logger.info(f"[WeiboCrawler.search] Current search keyword: {keyword}")
+            # 为每个关键词初始化计数器
+            notes_count_for_keyword = 0
             page = 1
             while (page - start_page + 1) * weibo_limit_count <= config.CRAWLER_MAX_NOTES_COUNT:
                 if page < start_page:
                     utils.logger.info(f"[WeiboCrawler.search] Skip page: {page}")
                     page += 1
                     continue
+                
+                # 检查是否达到每个关键词的限制
+                if notes_count_for_keyword >= config.CRAWLER_MAX_NOTES_PER_KEYWORD:
+                    utils.logger.info(f"[WeiboCrawler.search] Reached limit {config.CRAWLER_MAX_NOTES_PER_KEYWORD} for keyword '{keyword}', moving to next keyword")
+                    break
+                
                 utils.logger.info(f"[WeiboCrawler.search] search weibo keyword: {keyword}, page: {page}")
                 search_res = await self.wb_client.get_note_by_keyword(keyword=keyword, page=page, search_type=search_type)
                 note_id_list: List[str] = []
@@ -178,7 +186,12 @@ class WeiboCrawler(AbstractCrawler):
                         if mblog:
                             note_id_list.append(mblog.get("id"))
                             await weibo_store.update_weibo_note(note_item)
+                            notes_count_for_keyword += 1  # 增加计数
                             await self.get_note_images(mblog)
+                            
+                             # 如果达到限制，停止处理当前页的剩余帖子
+                            if notes_count_for_keyword >= config.CRAWLER_MAX_NOTES_PER_KEYWORD:
+                                break
 
                 page += 1
 

@@ -19,6 +19,7 @@
 
 import sys
 import io
+import os
 
 # Force UTF-8 encoding for stdout/stderr to prevent encoding errors
 # when outputting Chinese characters in non-UTF-8 terminals
@@ -105,6 +106,34 @@ async def main() -> None:
         await db.init_db(args.init_db)
         print(f"Database {args.init_db} initialized successfully.")
         return
+
+    # Load keywords from file or directory if specified
+    if config.KEYWORDS_FILE:
+        try:
+            keywords_set = set()
+            if os.path.isdir(config.KEYWORDS_FILE):
+                # Read all .txt files in the directory
+                for filename in os.listdir(config.KEYWORDS_FILE):
+                    if filename.endswith('.txt'):
+                        filepath = os.path.join(config.KEYWORDS_FILE, filename)
+                        with open(filepath, 'r', encoding='utf-8') as f:
+                            for line in f:
+                                keyword = line.strip()
+                                if keyword:
+                                    keywords_set.add(keyword)
+            elif os.path.isfile(config.KEYWORDS_FILE):
+                # Read single file
+                with open(config.KEYWORDS_FILE, 'r', encoding='utf-8') as f:
+                    for line in f:
+                        keyword = line.strip()
+                        if keyword:
+                            keywords_set.add(keyword)
+            
+            if keywords_set:
+                config.KEYWORDS = ",".join(keywords_set)
+                print(f"[Main] Loaded {len(keywords_set)} unique keywords from {config.KEYWORDS_FILE}")
+        except Exception as e:
+            print(f"[Main] Error loading keywords: {e}")
 
     crawler = CrawlerFactory.create_crawler(platform=config.PLATFORM)
     await crawler.start()
