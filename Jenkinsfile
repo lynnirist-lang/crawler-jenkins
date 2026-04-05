@@ -34,8 +34,8 @@ pipeline {
                     // 2. 再安装你的依赖
                     sh '''
                         if [ -f "requirements.txt" ]; then
-                            pip3 install -r requirements.txt
-                        else
+                            pip3 install --break-system-packages -r requirements.txt
+			else
                             echo "requirements.txt 未找到"
                         fi
                     '''
