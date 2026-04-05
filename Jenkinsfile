@@ -15,24 +15,27 @@ pipeline {
                 checkout scm
             }
         }
-
         stage('准备 Python 环境') {
             steps {
                 script {
-                    echo '正在安装 Python 依赖...'
-                    // 确保 Jenkins 容器内安装了 python3 和 pip3
-                    // 如果 requirements.txt 存在，则安装依赖
+                    echo '正在安装 Python3 和 Pip...'
+                    // 1. 先安装 Python3 和 Pip (需要 root 权限，如果报权限错请看下方提示)
+                    sh '''
+                        apt-get update && apt-get install -y python3 python3-pip
+                    '''
+
+                    echo '正在安装依赖库...'
+                    // 2. 再安装你的依赖
                     sh '''
                         if [ -f "requirements.txt" ]; then
                             pip3 install -r requirements.txt
                         else
-                            echo "requirements.txt 未找到，跳过依赖安装"
+                            echo "requirements.txt 未找到"
                         fi
                     '''
                 }
             }
         }
-
         stage('执行爬虫任务') {
             steps {
                 script {
