@@ -18,10 +18,16 @@ pipeline {
         stage('准备 Python 环境') {
             steps {
                 script {
-                    echo '正在安装 Python3 和 Pip...'
-                    // 1. 先安装 Python3 和 Pip (需要 root 权限，如果报权限错请看下方提示)
+                    echo '正在配置国内镜像源并安装 Python3...'
                     sh '''
-                        apt-get update && apt-get install -y python3 python3-pip
+                        # 1. 将 Debian 软件源替换为清华大学的镜像源
+                       sed -i 's|http://deb.debian.org|https://mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list.d/debian.sources
+
+                       # 2. 更新软件包列表 (现在会从清华源下载，速度飞快)
+                       apt-get update
+
+                       # 3. 安装 Python3 和 Pip (自动确认安装，无需手动输入 Y)
+                       apt-get install -y python3 python3-pip
                     '''
 
                     echo '正在安装依赖库...'
