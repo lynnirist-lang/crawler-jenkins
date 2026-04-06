@@ -31,5 +31,10 @@ RUN uv sync --frozen --no-cache -i https://pypi.tuna.tsinghua.edu.cn/simple
 # 复制所有源代码
 COPY . .
 
+# 安装 Playwright 浏览器及其系统依赖
+# 因为上面设置了 ENV，这里会自动从国内源下载 Chromium 并安装系统库
+RUN playwright install chromium
+RUN playwright install-deps chromium
+
 # 默认命令
 CMD ["echo", "Usage: docker run <image> python <script_path>.py"]
