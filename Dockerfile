@@ -36,7 +36,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends sed
 # 兼容 Debian 13 (Trixie) 的新格式 sources.list.d/debian.sources
 RUN sed -i 's|http://deb.debian.org|https://mirrors.tuna.tsinghua.edu.cn/debian|g' /etc/apt/sources.list.d/debian.sources && \
     sed -i 's|http://security.debian.org|https://mirrors.tuna.tsinghua.edu.cn/debian-security|g' /etc/apt/sources.list.d/debian.sources
-# 然后更新包列表（这次应该能成功连接）
 RUN apt-get update
 
 # 安装 Playwright 浏览器及其系统依赖
