@@ -30,15 +30,12 @@ RUN uv sync --frozen --no-cache -i https://pypi.tuna.tsinghua.edu.cn/simple
 
 # 复制所有源代码
 COPY . .
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    # 这里添加系统依赖，或者先更新源
-    # 注意：如果 apt-get update 失败，下面的安装也会失败
+RUN apt-get update && apt-get install -y --no-install-recommends sed
 
-# 【关键修改】更换为国内源
-# 对于 Debian 13 (Trixie)，使用清华源
-RUN sed -i 's|http://deb.debian.org|https://mirrors.tuna.tsinghua.edu.cn/debian|g' /etc/apt/sources.list && \
-    sed -i 's|http://security.debian.org|https://mirrors.tuna.tsinghua.edu.cn/debian-security|g' /etc/apt/sources.list
-
+# 2. 更换为清华源
+# 兼容 Debian 13 (Trixie) 的新格式 sources.list.d/debian.sources
+RUN sed -i 's|http://deb.debian.org|https://mirrors.tuna.tsinghua.edu.cn/debian|g' /etc/apt/sources.list.d/debian.sources && \
+    sed -i 's|http://security.debian.org|https://mirrors.tuna.tsinghua.edu.cn/debian-security|g' /etc/apt/sources.list.d/debian.sources
 # 然后更新包列表（这次应该能成功连接）
 RUN apt-get update
 
